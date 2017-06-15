@@ -6,14 +6,14 @@ import (
 	"strings"
 )
 
-func BuildNewSql(sql string) string {
+func BuildNewSql(sql string) (string, error) {
 
 	stmt, err := sqlparser.Parse(sql)
 
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println(err, sql)
 
-		return sql
+		return sql, err
 	}
 
 	switch v := stmt.(type) {
@@ -27,10 +27,10 @@ func BuildNewSql(sql string) string {
 		buf1 := sqlparser.NewTrackedBuffer(nil)
 		new_subquery.Select.Format(buf1)
 
-		return buf1.String()
+		return buf1.String(), nil
 	}
 
-	return ""
+	return sql, nil
 }
 
 func Subquery(v *sqlparser.Subquery) *sqlparser.Subquery {
@@ -65,16 +65,16 @@ func Subquery(v *sqlparser.Subquery) *sqlparser.Subquery {
 
 				// fmt.Printf("--val %#v \n", e.Name.String())
 
-                //关键字段不能使用 As
-                if keywordsFilter(e.Name.String()) && len(vvv.As.String()) > 0 {
-                //
-                //     // v.Select.(*sqlparser.Select).SelectExprs[i] = &sqlparser.AliasedExpr{Expr: sqlparser.NewStrVal([]byte("invalid field *")), As: sqlparser.NewColIdent("")}
-                //
-                    vvv.As = sqlparser.NewColIdent("")
+				//关键字段不能使用 As
+				if keywordsFilter(e.Name.String()) && len(vvv.As.String()) > 0 {
+					//
+					//     // v.Select.(*sqlparser.Select).SelectExprs[i] = &sqlparser.AliasedExpr{Expr: sqlparser.NewStrVal([]byte("invalid field *")), As: sqlparser.NewColIdent("")}
+					//
+					vvv.As = sqlparser.NewColIdent("")
 
-                }else{
-                    e = ColName(e)
-                }
+				} else {
+					e = ColName(e)
+				}
 
 			default:
 
@@ -168,11 +168,11 @@ func FuncExpr(e *sqlparser.FuncExpr) *sqlparser.FuncExpr {
 				// fmt.Printf("ee, %s, %s \n", e.Name.CompliantName(), eeee.Name.String())
 
 				//禁止字段使用 函数
-                if keywordsFilter(eeee.Name.String()) {
+				if keywordsFilter(eeee.Name.String()) {
 
-                    e.Exprs[i] = &sqlparser.AliasedExpr{Expr: sqlparser.NewStrVal([]byte(eeee.Name.String() + " field not use func")), As: sqlparser.NewColIdent("")}
+					e.Exprs[i] = &sqlparser.AliasedExpr{Expr: sqlparser.NewStrVal([]byte(eeee.Name.String() + " field not use func")), As: sqlparser.NewColIdent("")}
 
-                }
+				}
 
 			default:
 
