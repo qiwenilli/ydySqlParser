@@ -3,7 +3,7 @@ package ydySqlParser
 import (
 	"fmt"
 	"github.com/youtube/vitess/go/vt/sqlparser"
-	"strings"
+	// "strings"
 )
 
 func BuildNewSql(sql string) (string, error) {
@@ -36,13 +36,13 @@ func BuildNewSql(sql string) (string, error) {
 func Subquery(v *sqlparser.Subquery) *sqlparser.Subquery {
 
 	//range select field
-	for i, vv := range v.Select.(*sqlparser.Select).SelectExprs {
+	for _, vv := range v.Select.(*sqlparser.Select).SelectExprs {
 
 		switch vvv := vv.(type) {
 		case *sqlparser.StarExpr:
 
 			//如果是 * 不再支持
-			v.Select.(*sqlparser.Select).SelectExprs[i] = &sqlparser.AliasedExpr{Expr: sqlparser.NewStrVal([]byte("invalid field *")), As: sqlparser.NewColIdent("")}
+			// v.Select.(*sqlparser.Select).SelectExprs[i] = &sqlparser.AliasedExpr{Expr: sqlparser.NewStrVal([]byte("invalid field *")), As: sqlparser.NewColIdent("")}
 
 		case *sqlparser.AliasedExpr:
 			//
@@ -52,21 +52,25 @@ func Subquery(v *sqlparser.Subquery) *sqlparser.Subquery {
 				e = Subquery(e)
 
 			case *sqlparser.FuncExpr:
-				//字段使用方法
-
-				//如果不是insert 就要过滤下
-				if strings.ToLower(e.Name.String()) != "insert" {
-					// e = FuncExpr(e)
-				}
 
 				e = FuncExpr(e)
 
+			case *sqlparser.BinaryExpr:
+
+				e = BinaryExpr(e)
+
+			case *sqlparser.CaseExpr:
+
+				e = CaseExpr(e)
+
+			case *sqlparser.ParenExpr:
+
+				e = ParenExpr(e)
+
 			case *sqlparser.ColName:
 
-				// fmt.Printf("--val %#v \n", e.Name.String())
-
 				//关键字段不能使用 As
-				if keywordsFilter(e.Name.String()) && len(vvv.As.String()) > 0 {
+				if KeywordsFilter(e.Name.String(), "all") && len(vvv.As.String()) > 0 {
 					//
 					//     // v.Select.(*sqlparser.Select).SelectExprs[i] = &sqlparser.AliasedExpr{Expr: sqlparser.NewStrVal([]byte("invalid field *")), As: sqlparser.NewColIdent("")}
 					//
@@ -96,25 +100,9 @@ func Subquery(v *sqlparser.Subquery) *sqlparser.Subquery {
 			case *sqlparser.Subquery:
 
 				e = Subquery(e)
-			//
-			// case *sqlparser.FuncExpr:
-			//
-			//     e = FuncExpr(e)
-			//
-			// case *sqlparser.ColName:
-			//
-			//     e = ColName(e)
-			//
-			default:
-				// fmt.Printf("--val %#v \n", e)
+
 			}
 
-			// buf2 := sqlparser.NewTrackedBuffer(nil)
-			// vvv.Expr.Format(buf2)
-
-			//
-			// source_table := buf2.String()
-			//
 			// target_table, _ := sqlparser.Parse("select * from test")
 			//
 			// new_select := target_table.(*sqlparser.Select)
@@ -130,24 +118,7 @@ func Subquery(v *sqlparser.Subquery) *sqlparser.Subquery {
 
 func FuncExpr(e *sqlparser.FuncExpr) *sqlparser.FuncExpr {
 
-	// fun_name := strings.ToLower(e.Name.String())
-	//
-	// //禁止字段使用以下函数
-	// if t := func(str string) bool {
-	//     funlist := []string{"left", "right", "elt", "replace", "insert", "substring", "CONCAT", "BIN", "oct", "hex", "ASCII"}
-	//     for _, f := range funlist {
-	//         if f == fun_name {
-	//             return true
-	//         }
-	//     }
-	//     return false
-	// }(fun_name); t {
-	//
-	// }
-
 	for i, ee := range e.Exprs {
-
-		// fmt.Printf("ee : %#v \n", ee)
 
 		switch eee := ee.(type) {
 		case *sqlparser.AliasedExpr:
@@ -165,16 +136,12 @@ func FuncExpr(e *sqlparser.FuncExpr) *sqlparser.FuncExpr {
 
 				eeee = ColName(eeee)
 
-				// fmt.Printf("ee, %s, %s \n", e.Name.CompliantName(), eeee.Name.String())
-
 				//禁止字段使用 函数
-				if keywordsFilter(eeee.Name.String()) {
+				if KeywordsFilter(eeee.Name.String(), "all") {
 
 					e.Exprs[i] = &sqlparser.AliasedExpr{Expr: sqlparser.NewStrVal([]byte(eeee.Name.String() + " field not use func")), As: sqlparser.NewColIdent("")}
 
 				}
-
-			default:
 
 			}
 			// case *sqlparser.JoinTableExpr:
@@ -184,23 +151,81 @@ func FuncExpr(e *sqlparser.FuncExpr) *sqlparser.FuncExpr {
 	return e
 }
 
+func BinaryExpr(b *sqlparser.BinaryExpr) *sqlparser.BinaryExpr {
+
+	switch ee := b.Left.(type) {
+	case *sqlparser.ColName:
+
+		ee = ColName(ee)
+
+	}
+	switch ee := b.Right.(type) {
+	case *sqlparser.ColName:
+
+		ee = ColName(ee)
+
+	}
+
+	return b
+}
+
+func CaseExpr(e *sqlparser.CaseExpr) *sqlparser.CaseExpr {
+
+	for _, w := range e.Whens {
+		switch ww := w.Val.(type) {
+		case *sqlparser.Subquery:
+
+			ww = Subquery(ww)
+
+		case *sqlparser.FuncExpr:
+
+			ww = FuncExpr(ww)
+
+		case *sqlparser.BinaryExpr:
+
+			ww = BinaryExpr(ww)
+
+		case *sqlparser.ParenExpr:
+
+			ww = ParenExpr(ww)
+
+		case *sqlparser.ColName:
+
+			ww = ColName(ww)
+
+		}
+	}
+
+	return e
+}
+
+func ParenExpr(e *sqlparser.ParenExpr) *sqlparser.ParenExpr {
+
+	switch ee := e.Expr.(type) {
+	case *sqlparser.BinaryExpr:
+
+		ee = BinaryExpr(ee)
+
+	}
+
+	return e
+}
+
 func ColName(c *sqlparser.ColName) *sqlparser.ColName {
 
-	// fmt.Printf("===> %#v ,\n", c.Name)
+	if KeywordsFilter(c.Name.CompliantName(), "all") {
 
-	// if c.Name.String() == "abc" {
-	//
-	// 	_colident := sqlparser.NewColIdent("md5(abcd)")
-	//
-	// 	c.Name = _colident
-	// }
+		_colident := sqlparser.NewColIdent("invalid field")
+
+		c.Name = _colident
+	}
 
 	return c
 }
 
-func keywordsFilter(str string) bool {
+func KeywordsFilter(str string, field_type string) bool {
 
-	fieldList := []string{
+	mobile_fieldList := []string{
 		"mobile",
 		"u_mobile",
 		"b_mobile",
@@ -210,18 +235,47 @@ func keywordsFilter(str string) bool {
 		"emergency_mobile",
 		"link2_mate_mobile",
 		"customer_verification",
+		"bd_tel",
+		"c_mobile",
+		"master_mobile",
+		"slave_mobile",
+		"phone",
+		"ho_phone",
+		"customer_mobile",
+		"pt_mobile",
+		"mobile_bak",
+	}
+	idcard_fieldList := []string{
 		//
 		"id_card",
 		"b_id_card",
 		"link_id_card",
 		"link2_id_card",
 		"link2_mate_id_card",
+	}
+	bankcard_fieldList := []string{
 		//
 		"bank_card_one",
 		"bank_card_two",
 		"bank_card",
 		"b_bank_card",
 	}
+
+	var fieldList []string
+
+	switch field_type {
+	case "mobile":
+		fieldList = mobile_fieldList
+	case "idcard":
+		fieldList = idcard_fieldList
+	case "bankcard":
+		fieldList = bankcard_fieldList
+	case "all":
+		fieldList = append(fieldList, mobile_fieldList...)
+		fieldList = append(fieldList, idcard_fieldList...)
+		fieldList = append(fieldList, bankcard_fieldList...)
+	}
+
 	for _, _f := range fieldList {
 		if str == _f {
 			return true
