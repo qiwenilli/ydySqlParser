@@ -77,7 +77,7 @@ func Subquery(v *sqlparser.Subquery) *sqlparser.Subquery {
 					vvv.As = sqlparser.NewColIdent("")
 
 				} else {
-					e = ColName(e)
+					// e = ColName(e)
 				}
 
 			default:
@@ -118,7 +118,7 @@ func Subquery(v *sqlparser.Subquery) *sqlparser.Subquery {
 
 func FuncExpr(e *sqlparser.FuncExpr) *sqlparser.FuncExpr {
 
-	for i, ee := range e.Exprs {
+	for _, ee := range e.Exprs {
 
 		switch eee := ee.(type) {
 		case *sqlparser.AliasedExpr:
@@ -136,12 +136,12 @@ func FuncExpr(e *sqlparser.FuncExpr) *sqlparser.FuncExpr {
 
 				eeee = ColName(eeee)
 
-				//禁止字段使用 函数
-				if KeywordsFilter(eeee.Name.String(), "all") {
-
-					e.Exprs[i] = &sqlparser.AliasedExpr{Expr: sqlparser.NewStrVal([]byte(eeee.Name.String() + " field not use func")), As: sqlparser.NewColIdent("")}
-
-				}
+				// //禁止字段使用 函数
+				// if KeywordsFilter(eeee.Name.String(), "all") {
+                //
+				// 	e.Exprs[i] = &sqlparser.AliasedExpr{Expr: sqlparser.NewStrVal([]byte(eeee.Name.String() + " field not use func")), As: sqlparser.NewColIdent("")}
+                //
+				// }
 
 			}
 			// case *sqlparser.JoinTableExpr:
@@ -215,12 +215,13 @@ func ColName(c *sqlparser.ColName) *sqlparser.ColName {
 
 	if KeywordsFilter(c.Name.CompliantName(), "all") {
 
-		_colident := sqlparser.NewColIdent("invalid field")
+		// return &sqlparser.NewStrVal([]byte("invalid field -"))
 
-		c.Name = _colident
-	}
+		c.Name = sqlparser.NewColIdent(c.Name.CompliantName() + " Don't support syntax")
 
-	return c
+	} 
+
+    return c
 }
 
 func KeywordsFilter(str string, field_type string) bool {
