@@ -138,9 +138,9 @@ func FuncExpr(e *sqlparser.FuncExpr) *sqlparser.FuncExpr {
 
 				// //禁止字段使用 函数
 				// if KeywordsFilter(eeee.Name.String(), "all") {
-                //
+				//
 				// 	e.Exprs[i] = &sqlparser.AliasedExpr{Expr: sqlparser.NewStrVal([]byte(eeee.Name.String() + " field not use func")), As: sqlparser.NewColIdent("")}
-                //
+				//
 				// }
 
 			}
@@ -154,12 +154,21 @@ func FuncExpr(e *sqlparser.FuncExpr) *sqlparser.FuncExpr {
 func BinaryExpr(b *sqlparser.BinaryExpr) *sqlparser.BinaryExpr {
 
 	switch ee := b.Left.(type) {
+	case *sqlparser.BinaryExpr:
+
+		ee = BinaryExpr(ee)
+
 	case *sqlparser.ColName:
 
 		ee = ColName(ee)
 
 	}
+
 	switch ee := b.Right.(type) {
+	case *sqlparser.BinaryExpr:
+
+		ee = BinaryExpr(ee)
+
 	case *sqlparser.ColName:
 
 		ee = ColName(ee)
@@ -219,9 +228,9 @@ func ColName(c *sqlparser.ColName) *sqlparser.ColName {
 
 		c.Name = sqlparser.NewColIdent(c.Name.CompliantName() + " Don't support syntax")
 
-	} 
+	}
 
-    return c
+	return c
 }
 
 func KeywordsFilter(str string, field_type string) bool {

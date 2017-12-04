@@ -43,8 +43,6 @@ func BuildNewUpdateSql(sql, pkey string) (string, error) {
 	buf1 := sqlparser.NewTrackedBuffer(nil)
 	newSelect.Format(buf1)
 
-	fmt.Println(buf1.String())
-
 	return buf1.String(), nil
 }
 
